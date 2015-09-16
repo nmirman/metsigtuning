@@ -1,42 +1,113 @@
 import FWCore.ParameterSet.Config as cms
+from FWCore.ParameterSet.VarParsing import VarParsing
+import sys
 
-process = cms.Process("Demo")
+options = VarParsing ('analysis')
+
+options.setDefault( 'outputFile',
+      'ntuple.root'
+      )
+
+options.register( 'globalTag',
+      'MCRUN2_74',
+      VarParsing.multiplicity.singleton,
+      VarParsing.varType.string,
+      "CMS Global Tag"
+      )
+
+options.parseArguments()
+
+process = cms.Process("test")
 
 process.load("FWCore.MessageService.MessageLogger_cfi")
 process.load("METSigTuning.MakeNtuple.makentuple_cfi")
 process.load("RecoMET/METProducers.METSignificanceObjects_cfi")
+
+process.load("Configuration.Geometry.GeometryIdeal_cff")
+process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_cff")
+process.load("Configuration.StandardSequences.MagneticField_cff")
+process.GlobalTag.globaltag = ( options.globalTag+'::All' )
 
 process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(100) )
 process.MessageLogger.cerr.FwkReport.reportEvery = 1000
 
 process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring(
-       #"/store/mc/Phys14DR/DYJetsToLL_M-50_13TeV-madgraph-pythia8/AODSIM/PU20bx25_PHYS14_25_V1-v1/00000/00CC714A-F86B-E411-B99A-0025904B5FB8.root",
-       #"/store/mc/Phys14DR/DYJetsToLL_M-50_13TeV-madgraph-pythia8/AODSIM/PU20bx25_PHYS14_25_V1-v1/00000/040D9AF7-FB6B-E411-8106-0025907DBA06.root",
-       #"/store/mc/Phys14DR/DYJetsToLL_M-50_13TeV-madgraph-pythia8/AODSIM/PU20bx25_PHYS14_25_V1-v1/00000/04442001-036C-E411-9C90-0025901D42C0.root",
-       #"/store/mc/Phys14DR/DYJetsToLL_M-50_13TeV-madgraph-pythia8/AODSIM/PU20bx25_PHYS14_25_V1-v1/00000/08501832-106C-E411-BCEE-0025904B1420.root",
-       #"/store/mc/Phys14DR/DYJetsToLL_M-50_13TeV-madgraph-pythia8/AODSIM/PU20bx25_PHYS14_25_V1-v1/00000/0AA8983B-046C-E411-B0D3-0025901D4C3E.root",
-       #"/store/mc/Phys14DR/DYJetsToLL_M-50_13TeV-madgraph-pythia8/AODSIM/PU20bx25_PHYS14_25_V1-v1/00000/0C924143-0D6C-E411-B48A-0025907BAF70.root",
-       #"/store/mc/Phys14DR/DYJetsToLL_M-50_13TeV-madgraph-pythia8/AODSIM/PU20bx25_PHYS14_25_V1-v1/00000/0CB30B20-186C-E411-A85E-002590AC4BF6.root",
-       #"/store/mc/Phys14DR/DYJetsToLL_M-50_13TeV-madgraph-pythia8/AODSIM/PU20bx25_PHYS14_25_V1-v1/00000/0CF38497-006C-E411-A713-0025907DCA0C.root",
-       #"/store/mc/Phys14DR/DYJetsToLL_M-50_13TeV-madgraph-pythia8/AODSIM/PU20bx25_PHYS14_25_V1-v1/00000/0E2BE86D-1E6C-E411-9FD4-003048D4DEAE.root",
-       #"/store/mc/Phys14DR/DYJetsToLL_M-50_13TeV-madgraph-pythia8/AODSIM/PU20bx25_PHYS14_25_V1-v1/00000/0E50D3F3-056C-E411-8DF6-0025907DCA7E.root"
-       '/store/relval/CMSSW_7_3_0/RelValZMM_13/MINIAODSIM/MCRUN2_73_V7-v1/00000/127CA68E-8981-E411-A524-002590593872.root',
-       '/store/relval/CMSSW_7_3_0/RelValZMM_13/MINIAODSIM/MCRUN2_73_V7-v1/00000/56FE228D-8981-E411-9AD8-0025905A6126.root'
+       'root://xrootd.unl.edu//store/relval/CMSSW_7_4_0_pre9_ROOT6/DoubleMuParked/RECO/GR_R_74_V8_1Apr_RelVal_dm2012D-v2/00000/0002583F-CCDB-E411-91BB-003048FFCB6A.root'
+       #'root://xrootd.unl.edu//store/relval/CMSSW_7_4_0_pre9_ROOT6/DoubleMuParked/RECO/GR_R_74_V8_1Apr_RelVal_dm2012D-v2/00001/88B29EF6-9FDB-E411-8879-0025905A60BE.root'
     )
 )
 
-process.demo = cms.EDAnalyzer('MakeNtuple',
-      src = cms.InputTag("packedPFCandidates"),
-      jets = cms.InputTag("slimmedJets"),
-      leptons = cms.VInputTag("slimmedElectrons", "slimmedMuons", "slimmedPhotons"),
-      met = cms.InputTag("slimmedMETs"),
-      muons = cms.InputTag("slimmedMuons"),
-      vertices = cms.InputTag("offlineSlimmedPrimaryVertices")
+#process.load('JetMETCorrections.Configuration.DefaultJEC_cff')
+#process.load('JetMETCorrections.Configuration.JetCorrectionServices_cff')
+
+#from METSigTuning.MakeNtuple.JetCorrection_cff import *
+#process.load('METSigTuning.MakeNtuple.JetCorrection_cff')
+
+## met corrections setup copied from
+## https://github.com/TaiSakuma/WorkBookMet/blob/master/corrMet_cfg.py
+##____________________________________________________________________________||
+process.load("JetMETCorrections.Type1MET.correctionTermsCaloMet_cff")
+
+##____________________________________________________________________________||
+process.load("JetMETCorrections.Type1MET.correctionTermsPfMetType1Type2_cff")
+
+process.corrPfMetType1.jetCorrLabel = cms.string("ak5PFL1FastL2L3")
+# process.corrPfMetType1.jetCorrLabel = cms.string("ak5PFL1FastL2L3Residual")
+
+##____________________________________________________________________________||
+process.load("JetMETCorrections.Type1MET.correctionTermsPfMetType0PFCandidate_cff")
+
+##____________________________________________________________________________||
+process.load("JetMETCorrections.Type1MET.correctionTermsPfMetType0RecoTrack_cff")
+
+##____________________________________________________________________________||
+process.load("JetMETCorrections.Type1MET.correctionTermsPfMetShiftXY_cff")
+
+process.corrPfMetShiftXY.parameter = process.pfMEtSysShiftCorrParameters_2012runABCDvsNvtx_mc
+# process.corrPfMetShiftXY.parameter = process.pfMEtSysShiftCorrParameters_2012runABCDvsNvtx_data
+
+##____________________________________________________________________________||
+process.load("JetMETCorrections.Type1MET.correctedMet_cff")
+
+##____________________________________________________________________________||
+process.metcorr = cms.Sequence(
+      process.correctionTermsPfMetType1Type2 +
+      process.correctionTermsPfMetType0RecoTrack +
+      process.correctionTermsPfMetType0PFCandidate +
+      process.correctionTermsPfMetShiftXY +
+      process.correctionTermsCaloMet +
+      process.caloMetT1 + 
+      process.caloMetT1T2 + 
+      process.pfMetT0rt +
+      process.pfMetT0rtT1 +
+      process.pfMetT0pc +
+      process.pfMetT0pcT1 +
+      process.pfMetT0rtTxy +
+      process.pfMetT0rtT1Txy +
+      process.pfMetT0pcTxy +
+      process.pfMetT0pcT1Txy +
+      process.pfMetT1 +
+      process.pfMetT1Txy
+      )
+
+process.test = cms.EDAnalyzer('MakeNtuple',
+      src = cms.InputTag("particleFlow"),
+      jets = cms.InputTag("ak4PFJets"),
+      #jets = cms.InputTag("ak4PFchsJetsL1FastL2L3"),
+      leptons = cms.VInputTag("gedGsfElectrons", "muons", "photons"),
+      met = cms.InputTag("pfMet"),
+      muons = cms.InputTag("muons"),
+      vertices = cms.InputTag("offlinePrimaryVertices"),
+      pfjetCorrectorL1 = cms.untracked.string("ak4PFchsL1Fastjet"),
+      pfjetCorrectorL123 = cms.untracked.string("ak4PFchsL1FastL2L3")
 )
+#if not options.runOnMC:
+#      process.demo.pfjetCorrectorL123 = 'ak5PFL1FastL2L3Residual'
 
 
 process.p = cms.Path(
-      #process.selectionSequenceForMETSig * 
-      process.demo
+      #process.metcorr *
+      #process.ak4PFchsJetsL1FastL2L3 *
+      process.test
       )

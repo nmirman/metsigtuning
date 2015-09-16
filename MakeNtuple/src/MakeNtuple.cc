@@ -77,6 +77,9 @@ class MakeNtuple : public edm::EDAnalyzer {
       edm::EDGetTokenT<edm::View<reco::Candidate> > muonToken_;
       edm::InputTag verticesTag_;
 
+      //std::string pfjetCorrectorL1_;
+      //std::string pfjetCorrectorL123_;
+
       //virtual void beginRun(edm::Run const&, edm::EventSetup const&) override;
       //virtual void endRun(edm::Run const&, edm::EventSetup const&) override;
       //virtual void beginLuminosityBlock(edm::LuminosityBlock const&, edm::EventSetup const&) override;
@@ -94,6 +97,7 @@ class MakeNtuple : public edm::EDAnalyzer {
       std::vector<double> muon_pt, muon_energy, muon_phi, muon_eta;
       std::vector<double> jet_pt, jet_energy, jet_phi, jet_eta;
       std::vector<double> jet_sigmapt, jet_sigmaphi;
+      std::vector<double> jet_corrL1, jet_corrL123;
       double met_pt, met_energy, met_phi, met_eta, met_sumpt;
       int nvertices;
 
@@ -125,6 +129,9 @@ MakeNtuple::MakeNtuple(const edm::ParameterSet& iConfig)
    metTag_ = iConfig.getParameter<edm::InputTag>("met");
    muonToken_ = consumes<edm::View<reco::Candidate> >(iConfig.getParameter<edm::InputTag>("muons"));
    verticesTag_ = iConfig.getParameter<edm::InputTag>("vertices");
+
+   //pfjetCorrectorL1_  = iConfig.getUntrackedParameter<std::string>("pfjetCorrectorL1");
+   //pfjetCorrectorL123_ = iConfig.getUntrackedParameter<std::string>("pfjetCorrectorL123");
 
    jetThreshold = 20;
 
@@ -175,7 +182,6 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    Handle<View<reco::Candidate> > input;
    iEvent.getByToken(inputToken_, input);
 
-   //std::cout << "Leptons: ";
    // leptons
    std::vector<reco::CandidatePtr> footprint;
    std::vector<reco::Candidate::LorentzVector> leptons;
@@ -186,7 +192,6 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       for ( reco::CandidateView::const_iterator lepton = leptons_i->begin();
             lepton != leptons_i->end(); ++lepton ) {
          // cut on lepton pt
-         //std::cout << lepton->pt() << " ";
          if( lepton->pt() > 10 ){
             leptons.push_back(lepton->p4());
             for( unsigned int n=0; n < lepton->numberOfSourceCandidatePtrs(); n++){
@@ -197,7 +202,6 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
          }
       }
    }
-   //std::cout << std::endl;
 
    // muons (for event selection)
    Handle<reco::CandidateView> muons;
@@ -222,6 +226,10 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       dimuon_mass = (mu1+mu2).M();
    }
 
+   // jet energy corrections
+   //const JetCorrector* corrL1  = JetCorrector::getJetCorrector (pfjetCorrectorL1_, iSetup);
+   //const JetCorrector* corrL123 = JetCorrector::getJetCorrector (pfjetCorrectorL123_, iSetup);
+       
    // jets
    Handle<View<reco::Jet>> inputJets;
    iEvent.getByToken( jetToken_, inputJets );
@@ -243,9 +251,9 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    }
 
    // met
-   Handle<View<reco::MET> > metHandle;
+   Handle<std::vector<reco::PFMET> > metHandle;
    iEvent.getByLabel(metTag_, metHandle);
-   reco::MET met = (*metHandle)[0];
+   reco::PFMET met = metHandle.product()->front();
 
    met_pt = met.pt();
    met_energy = met.energy();
@@ -297,12 +305,10 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       lep_eta.push_back( lepton->Eta() );
    }
 
-   //std::cout << "Jets: ";
    // loop over jets
    for(std::vector<reco::Jet>::const_iterator jet = cleanjets.begin(); jet != cleanjets.end(); ++jet) {
       double jpt  = jet->pt();
       double jeta = jet->eta();
-      //std::cout << jpt << " ";
 
       // jet energy resolutions
       double jeta_res = (fabs(jeta) < 9.9) ? jeta : 9.89; // JetResolutions defined for |eta|<9.9
@@ -329,6 +335,9 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
          jet_sigmapt.push_back( sigmapt );
          jet_sigmaphi.push_back( sigmaphi );
 
+         //jet_corrL1.push_back( corrL1->correction(*jet, iEvent, iSetup) );
+         //jet_corrL123.push_back( corrL123->correction(*jet, iEvent, iSetup) );
+
       }else{
 
          // subtract the pf constituents in each jet out of the met_sumpt
@@ -340,9 +349,6 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
       }
    }
-   //std::cout << std::endl;
-
-   std::cout << "sumPt: " << met_sumpt << std::endl;
 
    // offline primary vertices
    edm::Handle<edm::View<reco::Vertex> > vertices;
@@ -412,6 +418,8 @@ MakeNtuple::beginJob()
    results_tree -> Branch("jet_eta", &jet_eta);
    results_tree -> Branch("jet_sigmapt", &jet_sigmapt);
    results_tree -> Branch("jet_sigmaphi", &jet_sigmaphi);
+   //results_tree -> Branch("jet_corrL1", &jet_corrL1);
+   //results_tree -> Branch("jet_corrL123", &jet_corrL123);
 
    results_tree -> Branch("met_pt", &met_pt);
    results_tree -> Branch("met_energy", &met_energy);

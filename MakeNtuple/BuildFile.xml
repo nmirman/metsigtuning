@@ -7,4 +7,5 @@
 <use name="DataFormats/METReco"/>
 <use name="CondFormats/JetMETObjects"/>
 <use name="DataFormats/Common"/>
+<use name="JetMETCorrections/Objects"/>
 <flags EDM_PLUGIN="1"/>
