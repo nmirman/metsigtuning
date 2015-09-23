@@ -45,55 +45,10 @@ process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring(
        #'root://xrootd.unl.edu//store/data/Run2015B/DoubleMuon/AOD/PromptReco-v1/000/251/162/00000/F6A6BB6F-4227-E511-BAAF-02163E014343.root'
        #'/store/data/Run2015B/DoubleMuon/AOD/PromptReco-v1/000/251/162/00000/F6A6BB6F-4227-E511-BAAF-02163E014343.root'
-       '/store/mc/RunIISpring15DR74/DYJetsToLL_M-50_TuneCUETP8M1_13TeV-amcatnloFXFX-pythia8/AODSIM/AsymptFlat10to50bx25Raw_MCRUN2_74_V9-v1/10000/00BA30CE-9001-E511-AA08-0025905A60D0.root'
+       #'/store/mc/RunIISpring15DR74/DYJetsToLL_M-50_TuneCUETP8M1_13TeV-amcatnloFXFX-pythia8/AODSIM/AsymptFlat10to50bx25Raw_MCRUN2_74_V9-v1/10000/00BA30CE-9001-E511-AA08-0025905A60D0.root'
+       '/store/data/Run2015B/DoubleMuon/MINIAOD/PromptReco-v1/000/251/162/00000/12284DB9-4227-E511-A438-02163E013674.root'
     )
 )
-
-# correct jets
-#process.ak4PFchsCorr = cms.ESSource(
-#      'LXXXCorrectionService',
-#      #era = cms.string('Jec11V12'),
-#      #section   = cms.string(''),
-#      #level     = cms.string('L2Relative'),
-#      # the above 3 elements are needed only when the service is initialized from local txt files
-#      algorithm = cms.string('AK4PFchs'),
-#      # the 'algorithm' tag is also the name of the DB payload
-#      useCondDB = cms.untracked.bool(True)
-#      )
-
-from JetMETCorrections.Configuration.JetCorrectionServicesAllAlgos_cff import *
-from JetMETCorrections.Configuration.DefaultJEC_cff import *
-
-process.ak4PFCHSJetsCorrected = cms.EDProducer('PFJetCorrectionProducer',
-      #src         = cms.InputTag('ak4PFCHSJets'),
-      #correctors  = cms.vstring('AK4PF')
-      src = cms.InputTag('ak4PFJets'),
-      correctors = cms.vstring("ak4PFL1FastL2L3") 
-      )
-
-#process.load('JetMETCorrections.Configuration.DefaultJEC_cff')
-#process.load('JetMETCorrections.Configuration.JetCorrectionServices_cff')
-
-#from METSigTuning.MakeNtuple.JetCorrection_cff import *
-#process.load('METSigTuning.MakeNtuple.JetCorrection_cff')
-
-## met corrections setup copied from
-## https://github.com/TaiSakuma/WorkBookMet/blob/master/corrMet_cfg.py
-##____________________________________________________________________________||
-process.load("JetMETCorrections.Type1MET.correctionTermsPfMetType1Type2_cff")
-
-process.corrPfMetType1.jetCorrLabel = cms.InputTag("ak4PFL1FastL2L3Corrector")
-if not options.runOnMC:
-  process.corrPfMetType1.jetCorrLabel = cms.InputTag("ak4PFL1FastL2L3ResidualCorrector")
-
-##____________________________________________________________________________||
-process.load("JetMETCorrections.Type1MET.correctedMet_cff")
-
-##____________________________________________________________________________||
-process.metcorr = cms.Sequence(
-      process.correctionTermsPfMetType1Type2 +
-      process.pfMetT1
-      )
 
 process.test = cms.EDAnalyzer('MakeNtuple',
       src = cms.InputTag("particleFlow"),
@@ -110,9 +65,6 @@ if not options.runOnMC:
 
 
 process.p = cms.Path(
-      process.metcorr *
-      #process.ak4PFchsJetsL1FastL2L3 *
-      process.ak4PFCHSJetsCorrected * 
       process.test
       )
 
