@@ -8,4 +8,5 @@
 <use name="CondFormats/JetMETObjects"/>
 <use name="DataFormats/Common"/>
 <use name="JetMETCorrections/Objects"/>
+<use name="PhysicsTools/PatUtils"/>
 <flags EDM_PLUGIN="1"/>

@@ -38,6 +38,11 @@
 #include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
 #include "DataFormats/MuonReco/interface/Muon.h"
 #include "DataFormats/PatCandidates/interface/Jet.h"
+#include "DataFormats/MuonReco/interface/MuonSelectors.h"
+#include "DataFormats/PatCandidates/interface/Muon.h"
+
+#include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h"
+#include "PhysicsTools/Utilities/interface/LumiReWeighting.h"
 
 #include "TLorentzVector.h"
 #include "TFile.h"
@@ -73,9 +78,13 @@ class MakeNtuple : public edm::EDAnalyzer {
       edm::EDGetTokenT<edm::View<reco::Candidate> > inputToken_;
       edm::EDGetTokenT<edm::View<reco::Jet> > jetToken_;
       std::vector< edm::EDGetTokenT<edm::View<reco::Candidate> > > lepTokens_;
-      edm::InputTag metTag_;
-      edm::EDGetTokenT<edm::View<reco::Candidate> > muonToken_;
+      edm::EDGetTokenT<edm::View<reco::MET> > metToken_;
+      edm::EDGetTokenT< std::vector<pat::Muon> > muonToken_;
       edm::InputTag verticesTag_;
+      Bool_t runOnMC_;
+      edm::InputTag addPileupInfo_;
+
+      //edm::LumiReWeighting LumiWeights_;
 
       //std::string pfjetCorrectorL1_;
       //std::string pfjetCorrectorL123_;
@@ -100,6 +109,7 @@ class MakeNtuple : public edm::EDAnalyzer {
       std::vector<double> jet_corrL1, jet_corrL123;
       double met_pt, met_energy, met_phi, met_eta, met_sumpt;
       int nvertices;
+      double weight_pu;
 
       double jetThreshold;
 
@@ -126,9 +136,11 @@ MakeNtuple::MakeNtuple(const edm::ParameterSet& iConfig)
    for(std::vector<edm::InputTag>::const_iterator it=srcLeptonsTags.begin();it!=srcLeptonsTags.end();it++) {
       lepTokens_.push_back( consumes<edm::View<reco::Candidate> >( *it ) );
    }
-   metTag_ = iConfig.getParameter<edm::InputTag>("met");
-   muonToken_ = consumes<edm::View<reco::Candidate> >(iConfig.getParameter<edm::InputTag>("muons"));
+   metToken_ = consumes<edm::View<reco::MET> >(iConfig.getParameter<edm::InputTag>("met"));
+   muonToken_ = consumes< std::vector<pat::Muon> >(iConfig.getParameter<edm::InputTag>("muons"));
    verticesTag_ = iConfig.getParameter<edm::InputTag>("vertices");
+   runOnMC_ = iConfig.getUntrackedParameter<Bool_t>("runOnMC");
+   addPileupInfo_ = iConfig.getParameter<edm::InputTag>("addPileupInfo");
 
    //pfjetCorrectorL1_  = iConfig.getUntrackedParameter<std::string>("pfjetCorrectorL1");
    //pfjetCorrectorL123_ = iConfig.getUntrackedParameter<std::string>("pfjetCorrectorL123");
@@ -182,6 +194,11 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    Handle<View<reco::Candidate> > input;
    iEvent.getByToken(inputToken_, input);
 
+   // offline primary vertices
+   edm::Handle<edm::View<reco::Vertex> > vertices;
+   iEvent.getByLabel(verticesTag_, vertices);
+   nvertices = int(vertices->size());
+
    // leptons
    std::vector<reco::CandidatePtr> footprint;
    std::vector<reco::Candidate::LorentzVector> leptons;
@@ -204,12 +221,21 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    }
 
    // muons (for event selection)
-   Handle<reco::CandidateView> muons;
+   Handle< std::vector<pat::Muon> > muons;
    iEvent.getByToken(muonToken_, muons);
    double nmuons = 0;
-   for ( reco::CandidateView::const_iterator muon = muons->begin();
+   for ( std::vector<pat::Muon>::const_iterator muon = muons->begin();
          muon != muons->end(); ++muon ) {
-      if( muon->pt() > 20 and fabs(muon->eta()) < 2.4 ){
+
+      bool muId = muon->isTightMuon((*(vertices->begin())));
+
+      double dr04chHad = muon->pfIsolationR04().sumChargedHadronPt;
+      double dr04neutHad = muon->pfIsolationR04().sumNeutralHadronEt;
+      double dr04photons = muon->pfIsolationR04().sumPhotonEt;
+
+      bool muIso = (dr04chHad + dr04neutHad + dr04photons)/muon->pt() < 0.12;
+
+      if( muon->pt() > 20 and fabs(muon->eta()) < 2.4 and muId and muIso ){
          muon_pt.push_back( muon->pt() );
          muon_energy.push_back( muon->energy() );
          muon_phi.push_back( muon->phi() );
@@ -251,14 +277,36 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    }
 
    // met
-   Handle<std::vector<reco::PFMET> > metHandle;
-   iEvent.getByLabel(metTag_, metHandle);
-   reco::PFMET met = metHandle.product()->front();
+   edm::Handle<edm::View<reco::MET> > metHandle;
+   iEvent.getByToken(metToken_, metHandle);
+   const reco::MET& met = (*metHandle)[0];
 
    met_pt = met.pt();
    met_energy = met.energy();
    met_phi = met.phi();
    met_eta = met.eta();
+
+   /*
+   std::cout << "MET (new) = " << met_pt << std::endl;
+
+   edm::Handle<edm::View<reco::MET> > metHandle2;
+   iEvent.getByLabel("slimmedMETs", metHandle2);
+   const reco::MET& met2 = (*metHandle2)[0];
+
+   double met2_pt = met2.pt();
+   std::cout << "MET (old) = " << met2_pt << std::endl;
+
+   edm::Handle<edm::View<reco::MET> > metHandle3;
+   iEvent.getByLabel("pfMetRERUN", metHandle3);
+   const reco::MET& met3 = (*metHandle3)[0];
+
+   double met3_pt = met3.pt();
+   std::cout << "MET (uncorr) = " << met3_pt << std::endl;
+
+   std::cout << " ************************* " << std::endl;
+
+   fflush(stdout);
+   */
 
    // candidates
    std::vector<reco::Candidate::LorentzVector> candidates;
@@ -289,6 +337,29 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    // begin ttree variables
    //
 
+   weight_pu = 1.0;
+   /*
+   if( runOnMC_ ){
+      std::vector<PileupSummaryInfo>::const_iterator PVI;
+      Handle<std::vector<PileupSummaryInfo> > PupInfo;
+      iEvent.getByLabel(addPileupInfo_, PupInfo);
+
+      float Tnvtx = -1.0;
+      for(PVI = PupInfo->begin(); PVI != PupInfo->end(); ++PVI) {
+
+         int BX = PVI->getBunchCrossing();
+
+         if(BX == 0) { 
+            Tnvtx = PVI->getTrueNumInteractions(); 
+            continue;
+         }
+
+         weight_pu = LumiWeights_.weight( Tnvtx );
+         T_nvertices = Tnvtx;
+      }
+   }
+   */
+
    // calculate met_sumpt
    met_sumpt = 0;
    for( std::vector<reco::Candidate::LorentzVector>::const_iterator cand = candidates.begin();
@@ -296,6 +367,7 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       met_sumpt += cand->Pt();
    }
 
+   /*
    // loop over leptons
    for ( std::vector<reco::Candidate::LorentzVector>::const_iterator lepton = leptons.begin();
          lepton != leptons.end(); ++lepton ) {
@@ -304,6 +376,7 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       lep_phi.push_back( lepton->Phi() );
       lep_eta.push_back( lepton->Eta() );
    }
+   */
 
    // loop over jets
    for(std::vector<reco::Jet>::const_iterator jet = cleanjets.begin(); jet != cleanjets.end(); ++jet) {
@@ -350,11 +423,6 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       }
    }
 
-   // offline primary vertices
-   edm::Handle<edm::View<reco::Vertex> > vertices;
-   iEvent.getByLabel(verticesTag_, vertices);
-   nvertices = int(vertices->size());
-   
    bool pass_selection = (nmuons == 2) and (dimuon_mass > 60) and (dimuon_mass < 120);
    if( pass_selection ){
       results_tree -> Fill();
@@ -395,7 +463,20 @@ MakeNtuple::cleanJets(double ptThreshold, double dRmatch,
 void 
 MakeNtuple::beginJob()
 {
+
    OutFile__file  = new TFile( OutputFileName_.c_str(), "RECREATE" );
+
+   /*
+   // pileup reweighting
+   std::vector< float > PU2012_MC;
+   std::vector< float > PU2012_Data;
+
+   for( int i=0; i<60; i++) {
+      PU2012_MC.push_back( PU2012_MCf[i] );
+      PU2012_Data.push_back( PU2012_Dataf[i] );
+   }
+   LumiWeights_ = LumiReWeighting( PU2012_MC, PU2012_Data);
+   */
 
    results_tree = new TTree("events", "events");
    results_tree -> Branch("run", &run, "run/I");
@@ -407,10 +488,12 @@ MakeNtuple::beginJob()
    results_tree -> Branch("muon_phi", &muon_phi);
    results_tree -> Branch("muon_eta", &muon_eta);
 
+   /*
    results_tree -> Branch("lep_pt", &lep_pt);
    results_tree -> Branch("lep_energy", &lep_energy);
    results_tree -> Branch("lep_phi", &lep_phi);
    results_tree -> Branch("lep_eta", &lep_eta);
+   */
 
    results_tree -> Branch("jet_pt", &jet_pt);
    results_tree -> Branch("jet_energy", &jet_energy);
@@ -428,6 +511,7 @@ MakeNtuple::beginJob()
    results_tree -> Branch("met_sumpt", &met_sumpt);
 
    results_tree -> Branch("nvertices", &nvertices);
+   results_tree -> Branch("weight_pu", &weight_pu);
 
 }
 
