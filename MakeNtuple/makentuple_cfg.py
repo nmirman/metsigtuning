@@ -58,15 +58,11 @@ process.MessageLogger.cerr.FwkReport.reportEvery = 1000
 
 process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring(
-       #'root://xrootd.unl.edu//store/data/Run2015B/DoubleMuon/AOD/PromptReco-v1/000/251/162/00000/F6A6BB6F-4227-E511-BAAF-02163E014343.root'
-       #'/store/data/Run2015B/DoubleMuon/AOD/PromptReco-v1/000/251/162/00000/F6A6BB6F-4227-E511-BAAF-02163E014343.root'
-       #'/store/mc/RunIISpring15DR74/DYJetsToLL_M-50_TuneCUETP8M1_13TeV-amcatnloFXFX-pythia8/AODSIM/AsymptFlat10to50bx25Raw_MCRUN2_74_V9-v1/10000/00BA30CE-9001-E511-AA08-0025905A60D0.root'
-       #'/store/data/Run2015B/DoubleMuon/MINIAOD/PromptReco-v1/000/251/162/00000/12284DB9-4227-E511-A438-02163E013674.root'
-       '/store/data/Run2015B/DoubleMuon/MINIAOD/17Jul2015-v1/30000/3226AF16-C22E-E511-B9D7-0025905A613C.root'
-       #'root://eoscms.cern.ch//store/data/Run2015B/JetHT/MINIAOD/PromptReco-v1/000/251/252/00000/263D331F-AF27-E511-969B-02163E012627.root'
+       '/store/data/Run2015D/DoubleMuon/MINIAOD/05Oct2015-v1/30000/04008DF6-8A6F-E511-B034-0025905A6136.root'
     )
 )
 
+"""
 # re-apply JECs
 from PhysicsTools.PatAlgos.producersLayer1.jetUpdater_cff import patJetCorrFactorsUpdated
 process.patJetCorrFactorsReapplyJEC = patJetCorrFactorsUpdated.clone(
@@ -203,14 +199,15 @@ getattr(process,"patPFMetT2Corr").src = jetCollectionUnskimmed
 getattr(process,'selectedPatJetsForMetT1T2Corr'+postfix).src = cms.InputTag('slimmedJets')
 getattr(process,'patPFMetTxyCorr'+postfix).vertexCollection = cms.InputTag('offlineSlimmedPrimaryVertices')
 getattr(process,'patPFMetTxyCorr'+postfix).srcPFlow = cms.InputTag('packedPFCandidates','')
+"""
 
 process.test = cms.EDAnalyzer('MakeNtuple',
       src = cms.InputTag("packedPFCandidates"),
-      #jets = cms.InputTag("slimmedJets"),
-      jets = cms.InputTag('patJetsReapplyJEC'),
+      jets = cms.InputTag("slimmedJets"),
+      #jets = cms.InputTag('patJetsReapplyJEC'),
       leptons = cms.VInputTag("slimmedElectrons", "slimmedMuons", "slimmedPhotons"),
-      #met = cms.InputTag("slimmedMETs"),
-      met = cms.InputTag("patPFMetT1TxyRERUN"),
+      met = cms.InputTag("slimmedMETs"),
+      #met = cms.InputTag("patPFMetT1TxyRERUN"),
       muons = cms.InputTag("slimmedMuons"),
       vertices = cms.InputTag("offlineSlimmedPrimaryVertices"),
       runOnMC = cms.untracked.bool(options.runOnMC),
@@ -266,12 +263,12 @@ process.p = cms.Path(
       process.HBHENoiseFilterResultProducer * #produces HBHE bools
       process.ApplyBaselineHBHENoiseFilter *  #reject events based 
       process.primaryVertexFilter *
-      process.patJetCorrFactorsReapplyJEC *
-      process.patJetsReapplyJEC *
-      getattr(process, "pfMet"+postfix) *
-      getattr(process, 'pat'+metType+'Met'+postfix) *
-      getattr(process, 'patMetCorrectionSequence'+postfix) *
-      getattr(process, metModName) *
+      #process.patJetCorrFactorsReapplyJEC *
+      #process.patJetsReapplyJEC *
+      #getattr(process, "pfMet"+postfix) *
+      #getattr(process, 'pat'+metType+'Met'+postfix) *
+      #getattr(process, 'patMetCorrectionSequence'+postfix) *
+      #getattr(process, metModName) *
       process.test
       )
 
