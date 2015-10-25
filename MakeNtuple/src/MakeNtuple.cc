@@ -32,6 +32,12 @@
 #include "CondFormats/JetMETObjects/interface/JetResolution.h"
 #include "JetMETCorrections/Objects/interface/JetCorrector.h"
 
+#include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
+#include "SimDataFormats/GeneratorProducts/interface/LHEEventProduct.h"
+#include "SimDataFormats/GeneratorProducts/interface/GenRunInfoProduct.h"
+#include "SimDataFormats/GeneratorProducts/interface/HepMCProduct.h"
+#include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h" 
+
 #include "DataFormats/METReco/interface/PFMET.h"
 #include "DataFormats/JetReco/interface/Jet.h"
 #include "DataFormats/Candidate/interface/Candidate.h"
@@ -110,8 +116,11 @@ class MakeNtuple : public edm::EDAnalyzer {
       double met_pt, met_energy, met_phi, met_eta, met_sumpt;
       int nvertices;
       double weight_pu;
+      double mcweight, mcweightSum;
 
       double jetThreshold;
+
+      int events_total, events_pass;
 
 };
 
@@ -146,6 +155,9 @@ MakeNtuple::MakeNtuple(const edm::ParameterSet& iConfig)
    //pfjetCorrectorL123_ = iConfig.getUntrackedParameter<std::string>("pfjetCorrectorL123");
 
    jetThreshold = 20;
+
+   mcweight = 1.0;
+   mcweightSum = 1.0;
 
    OutputFileName_ = "ntuple.root";
 
@@ -227,7 +239,8 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    for ( std::vector<pat::Muon>::const_iterator muon = muons->begin();
          muon != muons->end(); ++muon ) {
 
-      bool muId = muon->isTightMuon((*(vertices->begin())));
+      //bool muId = muon->isTightMuon((*(vertices->begin())));
+      bool muId = muon->isLooseMuon();
 
       double dr04chHad = muon->pfIsolationR04().sumChargedHadronPt;
       double dr04neutHad = muon->pfIsolationR04().sumNeutralHadronEt;
@@ -337,8 +350,21 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    // begin ttree variables
    //
 
-   weight_pu = 1.0;
+   if( runOnMC_ ){
+      Handle<GenEventInfoProduct> gi;
+      iEvent.getByLabel("generator", gi);
+
+      Handle<LHEEventProduct> li;
+      iEvent.getByLabel("externalLHEProducer", li) ;
+
+      mcweight = gi->weight();
+      mcweightSum = li->originalXWGTUP();
+      //std::cout << mcweight << " " << mcweightSum << std::endl;
+      //fflush(stdout);
+   }
+
    /*
+   weight_pu = 1.0;
    if( runOnMC_ ){
       std::vector<PileupSummaryInfo>::const_iterator PVI;
       Handle<std::vector<PileupSummaryInfo> > PupInfo;
@@ -423,9 +449,11 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       }
    }
 
+   events_total++;
    bool pass_selection = (nmuons == 2) and (dimuon_mass > 60) and (dimuon_mass < 120);
    if( pass_selection ){
       results_tree -> Fill();
+      events_pass++;
    }
 
    delete ptRes_;
@@ -464,6 +492,8 @@ void
 MakeNtuple::beginJob()
 {
 
+   events_total=0, events_pass=0;
+
    OutFile__file  = new TFile( OutputFileName_.c_str(), "RECREATE" );
 
    /*
@@ -482,6 +512,8 @@ MakeNtuple::beginJob()
    results_tree -> Branch("run", &run, "run/I");
    results_tree -> Branch("lumi", &lumi, "lumi/I");
    results_tree -> Branch("event", &event, "event/I");
+   results_tree -> Branch("mcweight", &mcweight, "mcweight/D");
+   results_tree -> Branch("mcweightSum", &mcweightSum, "mcweightSum/D");
 
    results_tree -> Branch("muon_pt", &muon_pt);
    results_tree -> Branch("muon_energy", &muon_energy);
@@ -521,6 +553,8 @@ MakeNtuple::endJob()
 {
    OutFile__file -> Write();
    OutFile__file -> Close();
+   std::cout << " *** NUMBER OF EVENTS PASSING SELECTION *** " << std::endl;
+   std::cout << " ------> " << events_pass << " / " << events_total << " = " << double(events_pass)/events_total << std::endl;
 }
 
 // ------------ method called when starting to processes a run  ------------

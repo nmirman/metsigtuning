@@ -19,7 +19,7 @@ options.register( 'globalTag',
       )
 
 options.register( 'runOnMC',
-      True,
+      False,
       VarParsing.multiplicity.singleton,
       VarParsing.varType.bool,
       "mc or data"
@@ -50,6 +50,9 @@ process.GlobalTag.globaltag = ( options.globalTag )
 process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(-1) )
 process.MessageLogger.cerr.FwkReport.reportEvery = 1000
 
+# print statistics
+process.options = cms.untracked.PSet(wantSummary = cms.untracked.bool(True))
+
 # Set the process options -- Display summary at the end, enable unscheduled execution
 #process.options = cms.untracked.PSet(
 #      allowUnscheduled = cms.untracked.bool(True),
@@ -58,7 +61,10 @@ process.MessageLogger.cerr.FwkReport.reportEvery = 1000
 
 process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring(
-       '/store/data/Run2015D/DoubleMuon/MINIAOD/05Oct2015-v1/30000/04008DF6-8A6F-E511-B034-0025905A6136.root'
+       #'/store/mc/RunIISpring15MiniAODv2/DYJetsToLL_M-50_TuneCUETP8M1_13TeV-amcatnloFXFX-pythia8/MINIAODSIM/74X_mcRun2_asymptotic_v2-v1/50000/00759690-D16E-E511-B29E-00261894382D.root'
+       '/store/mc/RunIISpring15DR74/DYJetsToLL_M-50_TuneCUETP8M1_13TeV-amcatnloFXFX-pythia8/MINIAODSIM/Asympt25ns_MCRUN2_74_V9-v3/10000/009D49A5-7314-E511-84EF-0025905A605E.root'
+       #'/store/data/Run2015D/DoubleMuon/MINIAOD/05Oct2015-v1/30000/04008DF6-8A6F-E511-B034-0025905A6136.root'
+       #'/store/data/Run2015D/DoubleMuon/MINIAOD/PromptReco-v4/000/258/159/00000/0C6D4AB0-6F6C-E511-8A64-02163E0133CD.root'
     )
 )
 
@@ -215,7 +221,7 @@ process.test = cms.EDAnalyzer('MakeNtuple',
 )
 
 # trigger filter                
-trigger_paths = ['HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ_v*', 'HLT_Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL_DZ_v*']
+trigger_paths = ['HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ_v', 'HLT_Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL_DZ_v']
 trigger_pattern = [path+"*" for path in trigger_paths]
 from HLTrigger.HLTfilters.hltHighLevel_cfi import *
 process.triggerSelection = hltHighLevel.clone(
@@ -243,6 +249,8 @@ process.eeBadScFilter = hltHighLevel.clone(
 ##___________________________HCAL_Noise_Filter________________________________||
 process.load('CommonTools.RecoAlgos.HBHENoiseFilterResultProducer_cfi')
 process.HBHENoiseFilterResultProducer.minZeros = cms.int32(99999)
+process.HBHENoiseFilterResultProducer.IgnoreTS4TS5ifJetInLowBVRegion=cms.bool(False) 
+process.HBHENoiseFilterResultProducer.defaultDecision = cms.string("HBHENoiseFilterResultRun2Loose")
 
 process.ApplyBaselineHBHENoiseFilter = cms.EDFilter('BooleanFlagFilter',
       inputLabel = cms.InputTag('HBHENoiseFilterResultProducer','HBHENoiseFilterResult'),
