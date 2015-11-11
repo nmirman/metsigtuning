@@ -40,12 +40,14 @@
 
 #include "DataFormats/METReco/interface/PFMET.h"
 #include "DataFormats/JetReco/interface/Jet.h"
+#include "DataFormats/JetReco/interface/PFJet.h"
 #include "DataFormats/Candidate/interface/Candidate.h"
 #include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
 #include "DataFormats/MuonReco/interface/Muon.h"
 #include "DataFormats/PatCandidates/interface/Jet.h"
 #include "DataFormats/MuonReco/interface/MuonSelectors.h"
 #include "DataFormats/PatCandidates/interface/Muon.h"
+#include "DataFormats/PatCandidates/interface/MET.h"
 
 #include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h"
 #include "PhysicsTools/Utilities/interface/LumiReWeighting.h"
@@ -54,6 +56,8 @@
 #include "TFile.h"
 #include "TTree.h"
 #include "TMatrixD.h"
+
+#include "Math/LorentzVector.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -79,12 +83,12 @@ class MakeNtuple : public edm::EDAnalyzer {
       virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
       virtual void endJob() override;
 
-      std::vector<reco::Jet> cleanJets(double, double,
-            std::vector<reco::Jet>&, std::vector<reco::Candidate::LorentzVector>&);
+      std::vector<pat::Jet> cleanJets(double, double,
+            std::vector<pat::Jet>&, std::vector<reco::Candidate::LorentzVector>&);
       edm::EDGetTokenT<edm::View<reco::Candidate> > inputToken_;
-      edm::EDGetTokenT<edm::View<reco::Jet> > jetToken_;
+      edm::EDGetTokenT<edm::View<pat::Jet> > jetToken_;
       std::vector< edm::EDGetTokenT<edm::View<reco::Candidate> > > lepTokens_;
-      edm::EDGetTokenT<edm::View<reco::MET> > metToken_;
+      edm::EDGetTokenT<edm::View<pat::MET> > metToken_;
       edm::EDGetTokenT< std::vector<pat::Muon> > muonToken_;
       edm::InputTag verticesTag_;
       Bool_t runOnMC_;
@@ -113,6 +117,7 @@ class MakeNtuple : public edm::EDAnalyzer {
       std::vector<double> jet_pt, jet_energy, jet_phi, jet_eta;
       std::vector<double> jet_sigmapt, jet_sigmaphi;
       std::vector<double> jet_corrL1, jet_corrL123;
+      std::vector<bool> jet_passid;
       double met_pt, met_energy, met_phi, met_eta, met_sumpt;
       int nvertices;
       double weight_pu;
@@ -140,12 +145,12 @@ MakeNtuple::MakeNtuple(const edm::ParameterSet& iConfig)
 {
    //now do what ever initialization is needed
    inputToken_ = consumes<edm::View<reco::Candidate> >(iConfig.getParameter<edm::InputTag>("src"));
-   jetToken_ = consumes<edm::View<reco::Jet> >(iConfig.getParameter<edm::InputTag>("jets"));
+   jetToken_ = consumes<edm::View<pat::Jet> >(iConfig.getParameter<edm::InputTag>("jets"));
    std::vector<edm::InputTag> srcLeptonsTags = iConfig.getParameter< std::vector<edm::InputTag> >("leptons");
    for(std::vector<edm::InputTag>::const_iterator it=srcLeptonsTags.begin();it!=srcLeptonsTags.end();it++) {
       lepTokens_.push_back( consumes<edm::View<reco::Candidate> >( *it ) );
    }
-   metToken_ = consumes<edm::View<reco::MET> >(iConfig.getParameter<edm::InputTag>("met"));
+   metToken_ = consumes<edm::View<pat::MET> >(iConfig.getParameter<edm::InputTag>("met"));
    muonToken_ = consumes< std::vector<pat::Muon> >(iConfig.getParameter<edm::InputTag>("muons"));
    verticesTag_ = iConfig.getParameter<edm::InputTag>("vertices");
    runOnMC_ = iConfig.getUntrackedParameter<Bool_t>("runOnMC");
@@ -193,6 +198,7 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    muon_phi.clear();
    muon_eta.clear();
    jet_pt.clear();
+   jet_passid.clear();
    jet_energy.clear();
    jet_phi.clear();
    jet_eta.clear();
@@ -236,11 +242,12 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    Handle< std::vector<pat::Muon> > muons;
    iEvent.getByToken(muonToken_, muons);
    double nmuons = 0;
+   double charge = 1.0;
    for ( std::vector<pat::Muon>::const_iterator muon = muons->begin();
          muon != muons->end(); ++muon ) {
 
-      //bool muId = muon->isTightMuon((*(vertices->begin())));
-      bool muId = muon->isLooseMuon();
+      bool muId = muon->isTightMuon((*(vertices->begin())));
+      //bool muId = muon->isLooseMuon();
 
       double dr04chHad = muon->pfIsolationR04().sumChargedHadronPt;
       double dr04neutHad = muon->pfIsolationR04().sumNeutralHadronEt;
@@ -254,6 +261,7 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
          muon_phi.push_back( muon->phi() );
          muon_eta.push_back( muon->eta() );
          nmuons++;
+         charge *= muon->charge();
       }
    }
 
@@ -270,18 +278,18 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    //const JetCorrector* corrL123 = JetCorrector::getJetCorrector (pfjetCorrectorL123_, iSetup);
        
    // jets
-   Handle<View<reco::Jet>> inputJets;
+   Handle<View<pat::Jet>> inputJets;
    iEvent.getByToken( jetToken_, inputJets );
-   std::vector<reco::Jet> jets;
-   for(View<reco::Jet>::const_iterator jet = inputJets->begin(); jet != inputJets->end(); ++jet) {
+   std::vector<pat::Jet> jets;
+   for(View<pat::Jet>::const_iterator jet = inputJets->begin(); jet != inputJets->end(); ++jet) {
       jets.push_back( *jet );
    }
 
    // disambiguate jets and leptons
-   std::vector<reco::Jet> cleanjets = cleanJets(jetThreshold, 0.4, jets, leptons);
+   std::vector<pat::Jet> cleanjets = cleanJets(jetThreshold, 0.4, jets, leptons);
 
    // loop over jets to disambiguate candidates
-   for(std::vector<reco::Jet>::const_iterator jet = cleanjets.begin(); jet != cleanjets.end(); ++jet) {
+   for(std::vector<pat::Jet>::const_iterator jet = cleanjets.begin(); jet != cleanjets.end(); ++jet) {
       for( unsigned int n=0; n < jet->numberOfSourceCandidatePtrs(); n++){
          if( jet->sourceCandidatePtr(n).isNonnull() and jet->sourceCandidatePtr(n).isAvailable() ){
             footprint.push_back(jet->sourceCandidatePtr(n));
@@ -290,9 +298,23 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    }
 
    // met
-   edm::Handle<edm::View<reco::MET> > metHandle;
+   edm::Handle<edm::View<pat::MET> > metHandle;
    iEvent.getByToken(metToken_, metHandle);
-   const reco::MET& met = (*metHandle)[0];
+   const pat::MET& met = (*metHandle)[0];
+
+   // put met into a 4-vector, implement type-1 corrections
+   /*
+   reco::Candidate::LorentzVector pmetvec = met.shiftedP4_74x(pat::MET::METUncertainty(12),pat::MET::Raw);
+   TLorentzVector metvec;
+   metvec.SetPxPyPzE(pmetvec.px(), pmetvec.py(), pmetvec.pz(), pmetvec.energy());
+   for(std::vector<pat::Jet>::const_iterator jet = cleanjets.begin(); jet != cleanjets.end(); ++jet){
+      TLorentzVector jettemp;
+      jettemp.SetPxPyPzE(jet->px(), jet->py(), jet->pz(), jet->energy());
+      double cL1 = corrL1->correction( *jet, iEvent, iSetup );
+      double cL123 = corrL123->correction( *jet, iEvent, iSetup );
+      metvec -= (cL123-cL1)*jettemp;
+   }
+   */
 
    met_pt = met.pt();
    met_energy = met.energy();
@@ -387,6 +409,7 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    */
 
    // calculate met_sumpt
+   // candidates already have clean jets removed
    met_sumpt = 0;
    for( std::vector<reco::Candidate::LorentzVector>::const_iterator cand = candidates.begin();
          cand != candidates.end(); ++cand){
@@ -405,7 +428,7 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    */
 
    // loop over jets
-   for(std::vector<reco::Jet>::const_iterator jet = cleanjets.begin(); jet != cleanjets.end(); ++jet) {
+   for(std::vector<pat::Jet>::const_iterator jet = cleanjets.begin(); jet != cleanjets.end(); ++jet) {
       double jpt  = jet->pt();
       double jeta = jet->eta();
 
@@ -422,11 +445,6 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       if( jpt > jetThreshold ){
          // high-pt jets enter into the covariance matrix via JER
 
-         // subtract the pf constituents in each jet out of the met_sumpt
-         for(unsigned int i=0; i < jet->numberOfDaughters(); i++){
-            //met_sumpt -= jet->daughter(i)->pt();
-         }
-
          jet_pt.push_back( jet->pt() );
          jet_energy.push_back( jet->energy() );
          jet_phi.push_back( jet->phi() );
@@ -434,16 +452,29 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
          jet_sigmapt.push_back( sigmapt );
          jet_sigmaphi.push_back( sigmaphi );
 
+         // jet id
+         bool id_24 = true;
+         bool id_30 = true;
+         bool id_forw = true;
+         if( fabs(jet->eta()) <= 3.0 ){
+            id_30 = jet->neutralHadronEnergyFraction() < 0.99 and jet->neutralEmEnergyFraction() < 0.99
+               and (jet->chargedMultiplicity() + jet->neutralMultiplicity()) > 1;
+            if( fabs(jet->eta()) <= 2.4 ){
+               id_24 = jet->chargedHadronEnergyFraction() > 0 and jet->chargedMultiplicity() > 0
+                  and jet->chargedEmEnergyFraction() < 0.99;
+            }
+         } else {
+            id_forw = jet->neutralEmEnergyFraction() < 0.9 and jet->neutralMultiplicity() > 10;
+         }
+         jet_passid.push_back( id_24 and id_30 and id_forw );
+
          //jet_corrL1.push_back( corrL1->correction(*jet, iEvent, iSetup) );
          //jet_corrL123.push_back( corrL123->correction(*jet, iEvent, iSetup) );
 
       }else{
 
-         // subtract the pf constituents in each jet out of the met_sumpt
-         for(unsigned int i=0; i < jet->numberOfDaughters(); i++){
-            //met_sumpt -= jet->daughter(i)->pt();
-         }
          // add the (corrected) jet to the met_sumpt
+         // (was subtracted previously)
          met_sumpt += jpt;
 
       }
@@ -454,6 +485,12 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    if( pass_selection ){
       results_tree -> Fill();
       events_pass++;
+      //std::cout << cleanjets.size() << " / " << jets.size() << std::endl;
+      //std::cout << "Muon charge prod = " << charge; 
+      //if( charge > 0 ) std::cout << "****************************************************************";
+      //std::cout << std::endl;
+      //fflush(stdout);
+
    }
 
    delete ptRes_;
@@ -461,13 +498,13 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
 }
 
-   std::vector<reco::Jet>
+   std::vector<pat::Jet>
 MakeNtuple::cleanJets(double ptThreshold, double dRmatch,
-      std::vector<reco::Jet>& jets, std::vector<reco::Candidate::LorentzVector>& leptons)
+      std::vector<pat::Jet>& jets, std::vector<reco::Candidate::LorentzVector>& leptons)
 {
    double dR2match = dRmatch*dRmatch;
-   std::vector<reco::Jet> retVal;
-   for ( std::vector<reco::Jet>::const_iterator jet = jets.begin();
+   std::vector<pat::Jet> retVal;
+   for ( std::vector<pat::Jet>::const_iterator jet = jets.begin();
          jet != jets.end(); ++jet ) {
       bool isOverlap = false;
       for ( std::vector<reco::Candidate::LorentzVector>::const_iterator lepton = leptons.begin();
@@ -533,6 +570,7 @@ MakeNtuple::beginJob()
    results_tree -> Branch("jet_eta", &jet_eta);
    results_tree -> Branch("jet_sigmapt", &jet_sigmapt);
    results_tree -> Branch("jet_sigmaphi", &jet_sigmaphi);
+   results_tree -> Branch("jet_passid", &jet_passid);
    //results_tree -> Branch("jet_corrL1", &jet_corrL1);
    //results_tree -> Branch("jet_corrL123", &jet_corrL123);
 

@@ -38,7 +38,7 @@ process = cms.Process("test")
 
 process.load("FWCore.MessageService.MessageLogger_cfi")
 process.load("METSigTuning.MakeNtuple.makentuple_cfi")
-process.load("RecoMET/METProducers.METSignificanceObjects_cfi")
+#process.load("RecoMET/METProducers.METSignificanceObjects_cfi")
 
 process.load('Configuration.StandardSequences.Services_cff')
 process.load('Configuration.StandardSequences.GeometryDB_cff')
@@ -62,13 +62,13 @@ process.options = cms.untracked.PSet(wantSummary = cms.untracked.bool(True))
 process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring(
        #'/store/mc/RunIISpring15MiniAODv2/DYJetsToLL_M-50_TuneCUETP8M1_13TeV-amcatnloFXFX-pythia8/MINIAODSIM/74X_mcRun2_asymptotic_v2-v1/50000/00759690-D16E-E511-B29E-00261894382D.root'
-       '/store/mc/RunIISpring15DR74/DYJetsToLL_M-50_TuneCUETP8M1_13TeV-amcatnloFXFX-pythia8/MINIAODSIM/Asympt25ns_MCRUN2_74_V9-v3/10000/009D49A5-7314-E511-84EF-0025905A605E.root'
+       #'/store/mc/RunIISpring15DR74/DYJetsToLL_M-50_TuneCUETP8M1_13TeV-amcatnloFXFX-pythia8/MINIAODSIM/Asympt25ns_MCRUN2_74_V9-v3/10000/009D49A5-7314-E511-84EF-0025905A605E.root'
        #'/store/data/Run2015D/DoubleMuon/MINIAOD/05Oct2015-v1/30000/04008DF6-8A6F-E511-B034-0025905A6136.root'
        #'/store/data/Run2015D/DoubleMuon/MINIAOD/PromptReco-v4/000/258/159/00000/0C6D4AB0-6F6C-E511-8A64-02163E0133CD.root'
+       '/store/data/Run2015D/DoubleMuon/MINIAOD/PromptReco-v3/000/256/675/00000/4AA27F21-8B5F-E511-9AED-02163E014472.root'
     )
 )
 
-"""
 # re-apply JECs
 from PhysicsTools.PatAlgos.producersLayer1.jetUpdater_cff import patJetCorrFactorsUpdated
 process.patJetCorrFactorsReapplyJEC = patJetCorrFactorsUpdated.clone(
@@ -77,6 +77,8 @@ process.patJetCorrFactorsReapplyJEC = patJetCorrFactorsUpdated.clone(
          'L2Relative', 
          'L3Absolute'],
       payload = 'AK4PFchs' ) # Make sure to choose the appropriate levels and payload here!
+if not options.runOnMC:
+   process.patJetCorrFactorsReapplyJEC.levels.append('L2L3Residual')
 
 from PhysicsTools.PatAlgos.producersLayer1.jetUpdater_cff import patJetsUpdated
 process.patJetsReapplyJEC = patJetsUpdated.clone(
@@ -119,7 +121,7 @@ from PhysicsTools.PatAlgos.selectionLayer1.jetSelector_cfi import selectedPatJet
 setattr(process, "selectedPatJets"+postfix, selectedPatJets.clone() )
 
 getattr(process,"selectedPatJets"+postfix).src = cms.InputTag("patJets"+postfix)
-getattr(process,"selectedPatJets"+postfix).cut = cms.string("pt > 10")
+getattr(process,"selectedPatJets"+postfix).cut = cms.string("pt > 15")
 
 from PhysicsTools.PatAlgos.slimming.slimmedMETs_cfi import slimmedMETs
 setattr(process, "slimmedMETs"+postfix, slimmedMETs.clone() )
@@ -129,7 +131,8 @@ getattr(process,"slimmedMETs"+postfix).src = cms.InputTag("patPFMetT1"+postfix)
 patMetCorrectionSequence = cms.Sequence()
 patMetModuleSequence = cms.Sequence()
 metModName = "pat"+metType+"Met"+postfix
-correctionLevel=["T1","Txy"]
+#correctionLevel=["T1","Txy"]
+correctionLevel=["T1"]
 
 corNames = { #not really needed but in case we have changes in the future....
       "T0":"T0pc",
@@ -202,23 +205,28 @@ jetCollectionUnskimmed = cms.InputTag('patJets')
 getattr(process,"patPFMetT1T2Corr").src = jetCollectionUnskimmed
 getattr(process,"patPFMetT2Corr").src = jetCollectionUnskimmed
 
-getattr(process,'selectedPatJetsForMetT1T2Corr'+postfix).src = cms.InputTag('slimmedJets')
+#getattr(process,'selectedPatJetsForMetT1T2Corr'+postfix).src = cms.InputTag('slimmedJets')
+getattr(process,'selectedPatJetsForMetT1T2Corr'+postfix).src = cms.InputTag('patJetsReapplyJEC')
 getattr(process,'patPFMetTxyCorr'+postfix).vertexCollection = cms.InputTag('offlineSlimmedPrimaryVertices')
 getattr(process,'patPFMetTxyCorr'+postfix).srcPFlow = cms.InputTag('packedPFCandidates','')
-"""
 
 process.test = cms.EDAnalyzer('MakeNtuple',
       src = cms.InputTag("packedPFCandidates"),
-      jets = cms.InputTag("slimmedJets"),
-      #jets = cms.InputTag('patJetsReapplyJEC'),
+      #jets = cms.InputTag("slimmedJets"),
+      jets = cms.InputTag('patJetsReapplyJEC'),
       leptons = cms.VInputTag("slimmedElectrons", "slimmedMuons", "slimmedPhotons"),
-      met = cms.InputTag("slimmedMETs"),
+      #met = cms.InputTag("slimmedMETs"),
       #met = cms.InputTag("patPFMetT1TxyRERUN"),
+      met = cms.InputTag("patPFMetT1RERUN"),
       muons = cms.InputTag("slimmedMuons"),
       vertices = cms.InputTag("offlineSlimmedPrimaryVertices"),
       runOnMC = cms.untracked.bool(options.runOnMC),
       addPileupInfo = cms.InputTag("slimmedAddPileupInfo")
+      #pfjetCorrectorL1     = cms.untracked.string('ak4PFCHSL1FastjetCorrector'),
+      #pfjetCorrectorL123   = cms.untracked.string('ak4PFchsL1FastL2L3')
 )
+#if not options.runOnMC:
+#      process.test.pfjetCorrectorL123 = 'ak4PFchsL1FastL2L3Residual'
 
 # trigger filter                
 trigger_paths = ['HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ_v', 'HLT_Mu17_TrkIsoVVL_TkMu8_TrkIsoVVL_DZ_v']
@@ -271,12 +279,12 @@ process.p = cms.Path(
       process.HBHENoiseFilterResultProducer * #produces HBHE bools
       process.ApplyBaselineHBHENoiseFilter *  #reject events based 
       process.primaryVertexFilter *
-      #process.patJetCorrFactorsReapplyJEC *
-      #process.patJetsReapplyJEC *
-      #getattr(process, "pfMet"+postfix) *
-      #getattr(process, 'pat'+metType+'Met'+postfix) *
-      #getattr(process, 'patMetCorrectionSequence'+postfix) *
-      #getattr(process, metModName) *
+      process.patJetCorrFactorsReapplyJEC *
+      process.patJetsReapplyJEC *
+      getattr(process, "pfMet"+postfix) *
+      getattr(process, 'pat'+metType+'Met'+postfix) *
+      getattr(process, 'patMetCorrectionSequence'+postfix) *
+      getattr(process, metModName) *
       process.test
       )
 
