@@ -32,6 +32,8 @@
 #include "CondFormats/JetMETObjects/interface/JetResolution.h"
 #include "JetMETCorrections/Objects/interface/JetCorrector.h"
 
+#include "JetMETCorrections/Modules/interface/JetResolution.h"
+
 #include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
 #include "SimDataFormats/GeneratorProducts/interface/LHEEventProduct.h"
 #include "SimDataFormats/GeneratorProducts/interface/GenRunInfoProduct.h"
@@ -118,6 +120,7 @@ class MakeNtuple : public edm::EDAnalyzer {
       std::vector<double> jet_sigmapt, jet_sigmaphi;
       std::vector<double> jet_corrL1, jet_corrL123;
       std::vector<bool> jet_passid;
+      std::vector<double> jet_sf;
       double met_pt, met_energy, met_phi, met_eta, met_sumpt;
       int nvertices;
       double weight_pu;
@@ -204,6 +207,7 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    jet_eta.clear();
    jet_sigmapt.clear();
    jet_sigmaphi.clear();
+   jet_sf.clear();
 
    run = iEvent.id().run();
    event = iEvent.id().event();
@@ -357,16 +361,22 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
    // resolutions
    std::string path = "CondFormats/JetMETObjects/data";
-   std::string resEra_ = "Spring10";
-   std::string resAlg_ = "AK5PF";
-   std::string ptResFileName  = path + "/" + resEra_ + "_PtResolution_" +resAlg_+".txt";
-   std::string phiResFileName = path + "/" + resEra_ + "_PhiResolution_"+resAlg_+".txt";
+   std::string resEra_ = "Summer15_25nsV6";
+   std::string resAlg_ = "AK4PFchs";
+   std::string ptResFileName  = path + "/" + resEra_ + "_MC_PtResolution_" +resAlg_+".txt";
+   std::string phiResFileName = path + "/" + "Spring10" + "_PhiResolution_" + "AK5PF" + ".txt";
+   std::string sfResFileName  = path + "/" + resEra_ + "DATAMCSF_" +resAlg_+".txt";
 
+   // old framework
    FileInPath fpt(ptResFileName);
    FileInPath fphi(phiResFileName);
 
    JetResolution *ptRes_  = new JetResolution(fpt.fullPath().c_str(),false);
    JetResolution *phiRes_ = new JetResolution(fphi.fullPath().c_str(),false);
+
+   // new framework
+   JME::JetResolution resolution = JME::JetResolution(ptResFileName);
+   JME::JetResolutionScaleFactor resolution_sf = JME::JetResolutionScaleFactor(sfResFileName);
 
    //
    // begin ttree variables
@@ -441,6 +451,12 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       delete fPtEta;
       delete fPhiEta;
 
+      // new framework
+      JME::JetParameters parameters;
+      parameters.setJetPt(jpt).setJetEta(jeta);
+      sigmapt = resolution.getResolution(parameters);
+      double sf = resolution_sf.getScaleFactor(parameters);
+
       // split into high-pt and low-pt sector
       if( jpt > jetThreshold ){
          // high-pt jets enter into the covariance matrix via JER
@@ -451,6 +467,7 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
          jet_eta.push_back( jet->eta() );
          jet_sigmapt.push_back( sigmapt );
          jet_sigmaphi.push_back( sigmaphi );
+         jet_sf.push_back( sf );
 
          // jet id
          bool id_24 = true;
@@ -569,6 +586,7 @@ MakeNtuple::beginJob()
    results_tree -> Branch("jet_phi", &jet_phi);
    results_tree -> Branch("jet_eta", &jet_eta);
    results_tree -> Branch("jet_sigmapt", &jet_sigmapt);
+   results_tree -> Branch("jet_sf", &jet_sf);
    results_tree -> Branch("jet_sigmaphi", &jet_sigmaphi);
    results_tree -> Branch("jet_passid", &jet_passid);
    //results_tree -> Branch("jet_corrL1", &jet_corrL1);
