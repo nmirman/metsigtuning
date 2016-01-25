@@ -95,6 +95,7 @@ class MakeNtuple : public edm::EDAnalyzer {
       edm::InputTag verticesTag_;
       Bool_t runOnMC_;
       edm::InputTag addPileupInfo_;
+      edm::EDGetTokenT<double> rhoToken_;
 
       //edm::LumiReWeighting LumiWeights_;
 
@@ -158,11 +159,12 @@ MakeNtuple::MakeNtuple(const edm::ParameterSet& iConfig)
    verticesTag_ = iConfig.getParameter<edm::InputTag>("vertices");
    runOnMC_ = iConfig.getUntrackedParameter<Bool_t>("runOnMC");
    addPileupInfo_ = iConfig.getParameter<edm::InputTag>("addPileupInfo");
+   rhoToken_ = consumes<double>(iConfig.getParameter<edm::InputTag>("rho"));
 
    //pfjetCorrectorL1_  = iConfig.getUntrackedParameter<std::string>("pfjetCorrectorL1");
    //pfjetCorrectorL123_ = iConfig.getUntrackedParameter<std::string>("pfjetCorrectorL123");
 
-   jetThreshold = 20;
+   jetThreshold = 15;
 
    mcweight = 1.0;
    mcweightSum = 1.0;
@@ -360,23 +362,24 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    }
 
    // resolutions
-   std::string path = "CondFormats/JetMETObjects/data";
+   std::string path = "CondFormats/JetMETObjects/data/";
    std::string resEra_ = "Summer15_25nsV6";
    std::string resAlg_ = "AK4PFchs";
-   std::string ptResFileName  = path + "/" + resEra_ + "_MC_PtResolution_" +resAlg_+".txt";
-   std::string phiResFileName = path + "/" + "Spring10" + "_PhiResolution_" + "AK5PF" + ".txt";
-   std::string sfResFileName  = path + "/" + resEra_ + "DATAMCSF_" +resAlg_+".txt";
+   std::string ptResFileName  = /*"../../" + path + "data/" */path + resEra_ + "_MC_PtResolution_" +resAlg_+".txt";
+   std::string phiResFileName = /*path + "/" + */path+"Spring10_PhiResolution_AK5PF.txt";
+   std::string sfResFileName  = /*"../../" + path + "data/" */path + resEra_ + "_DATAMCSF_" +resAlg_+".txt";
 
    // old framework
    FileInPath fpt(ptResFileName);
    FileInPath fphi(phiResFileName);
+   FileInPath fsf(sfResFileName);
 
-   JetResolution *ptRes_  = new JetResolution(fpt.fullPath().c_str(),false);
+   //JetResolution *ptRes_  = new JetResolution(fpt.fullPath().c_str(),false);
    JetResolution *phiRes_ = new JetResolution(fphi.fullPath().c_str(),false);
 
    // new framework
-   JME::JetResolution resolution = JME::JetResolution(ptResFileName);
-   JME::JetResolutionScaleFactor resolution_sf = JME::JetResolutionScaleFactor(sfResFileName);
+   JME::JetResolution resolution = JME::JetResolution(fpt.fullPath().c_str());
+   JME::JetResolutionScaleFactor resolution_sf = JME::JetResolutionScaleFactor(fsf.fullPath().c_str());
 
    //
    // begin ttree variables
@@ -436,6 +439,8 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       lep_eta.push_back( lepton->Eta() );
    }
    */
+   edm::Handle<double> rho;
+   iEvent.getByToken(rhoToken_, rho);
 
    // loop over jets
    for(std::vector<pat::Jet>::const_iterator jet = cleanjets.begin(); jet != cleanjets.end(); ++jet) {
@@ -444,17 +449,17 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
       // jet energy resolutions
       double jeta_res = (fabs(jeta) < 9.9) ? jeta : 9.89; // JetResolutions defined for |eta|<9.9
-      TF1* fPtEta    = ptRes_ -> parameterEta("sigma",jeta_res);
+      //TF1* fPtEta    = ptRes_ -> parameterEta("sigma",jeta_res);
       TF1* fPhiEta   = phiRes_-> parameterEta("sigma",jeta_res);
-      double sigmapt = fPtEta->Eval(jpt);
+      //double sigmapt = fPtEta->Eval(jpt);
       double sigmaphi = fPhiEta->Eval(jpt);
-      delete fPtEta;
+      //delete fPtEta;
       delete fPhiEta;
 
       // new framework
       JME::JetParameters parameters;
-      parameters.setJetPt(jpt).setJetEta(jeta);
-      sigmapt = resolution.getResolution(parameters);
+      parameters.setJetPt(jpt).setJetEta(jeta).setRho(*rho);
+      double sigmapt = resolution.getResolution(parameters);
       double sf = resolution_sf.getScaleFactor(parameters);
 
       // split into high-pt and low-pt sector
@@ -510,7 +515,7 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
    }
 
-   delete ptRes_;
+   //delete ptRes_;
    delete phiRes_;
 
 }

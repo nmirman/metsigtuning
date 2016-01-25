@@ -222,10 +222,9 @@ process.test = cms.EDAnalyzer('MakeNtuple',
       vertices = cms.InputTag("offlineSlimmedPrimaryVertices"),
       runOnMC = cms.untracked.bool(options.runOnMC),
       addPileupInfo = cms.InputTag("slimmedAddPileupInfo"),
-      resolutionsFile = cms.FileInPath('CondFormats/JetMETObjects/data/Summer15_V0_MC_JER_AK4PFchs.txt'),
-      scaleFactorsFile = cms.FileInPath('CondFormats/JetMETObjects/data/Summer12_V1_MC_JER_SF_AK5PFchs.txt')
       #pfjetCorrectorL1     = cms.untracked.string('ak4PFCHSL1FastjetCorrector'),
       #pfjetCorrectorL123   = cms.untracked.string('ak4PFchsL1FastL2L3')
+      rho = cms.InputTag("fixedGridRhoAll")
 )
 #if not options.runOnMC:
 #      process.test.pfjetCorrectorL123 = 'ak4PFchsL1FastL2L3Residual'

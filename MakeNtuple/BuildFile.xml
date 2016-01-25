@@ -5,8 +5,9 @@
 <use name="DataFormats/ParticleFlowReco"/>
 <use name="DataFormats/JetReco"/>
 <use name="DataFormats/METReco"/>
-<use name="CondFormats/JetMETObjects"/>
 <use name="DataFormats/Common"/>
+<use name="CondFormats/JetMETObjects"/>
 <use name="JetMETCorrections/Objects"/>
+<use name="JetMETCorrections/Modules"/>
 <use name="PhysicsTools/PatUtils"/>
 <flags EDM_PLUGIN="1"/>
