@@ -362,12 +362,18 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    }
 
    // resolutions
-   std::string path = "CondFormats/JetMETObjects/data/";
+   //std::string path = "CondFormats/JetMETObjects/data/";
+   //std::string resEra_ = "Summer15_25nsV6";
+   //std::string resAlg_ = "AK4PFchs";
+   //std::string ptResFileName  = /*"../../" + path + "data/" */path + resEra_ + "_MC_PtResolution_" +resAlg_+".txt";
+   //std::string phiResFileName = /*path + "/" + */path+"Spring10_PhiResolution_AK5PF.txt";
+   //std::string sfResFileName  = /*"../../" + path + "data/" */path + resEra_ + "_DATAMCSF_" +resAlg_+".txt";
+   std::string path = "METSigTuning/MakeNtuple/data/";
    std::string resEra_ = "Summer15_25nsV6";
    std::string resAlg_ = "AK4PFchs";
-   std::string ptResFileName  = /*"../../" + path + "data/" */path + resEra_ + "_MC_PtResolution_" +resAlg_+".txt";
-   std::string phiResFileName = /*path + "/" + */path+"Spring10_PhiResolution_AK5PF.txt";
-   std::string sfResFileName  = /*"../../" + path + "data/" */path + resEra_ + "_DATAMCSF_" +resAlg_+".txt";
+   std::string ptResFileName  = path + resEra_ + "_MC_PtResolution_" +resAlg_+".txt";
+   std::string phiResFileName = path + resEra_ + "_MC_PhiResolution_" +resAlg_+".txt";
+   std::string sfResFileName  = path + resEra_ + "_DATAMCSF_" +resAlg_+".txt";
 
    // old framework
    FileInPath fpt(ptResFileName);
@@ -375,10 +381,11 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    FileInPath fsf(sfResFileName);
 
    //JetResolution *ptRes_  = new JetResolution(fpt.fullPath().c_str(),false);
-   JetResolution *phiRes_ = new JetResolution(fphi.fullPath().c_str(),false);
+   //JetResolution *phiRes_ = new JetResolution(fphi.fullPath().c_str(),false);
 
    // new framework
    JME::JetResolution resolution = JME::JetResolution(fpt.fullPath().c_str());
+   JME::JetResolution resolution_phi = JME::JetResolution(fphi.fullPath().c_str());
    JME::JetResolutionScaleFactor resolution_sf = JME::JetResolutionScaleFactor(fsf.fullPath().c_str());
 
    //
@@ -389,11 +396,11 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       Handle<GenEventInfoProduct> gi;
       iEvent.getByLabel("generator", gi);
 
-      Handle<LHEEventProduct> li;
-      iEvent.getByLabel("externalLHEProducer", li) ;
+      //Handle<LHEEventProduct> li;
+      //iEvent.getByLabel("externalLHEProducer", li) ;
 
       mcweight = gi->weight();
-      mcweightSum = li->originalXWGTUP();
+      //mcweightSum = li->originalXWGTUP();
       //std::cout << mcweight << " " << mcweightSum << std::endl;
       //fflush(stdout);
    }
@@ -448,18 +455,19 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       double jeta = jet->eta();
 
       // jet energy resolutions
-      double jeta_res = (fabs(jeta) < 9.9) ? jeta : 9.89; // JetResolutions defined for |eta|<9.9
+      //double jeta_res = (fabs(jeta) < 9.9) ? jeta : 9.89; // JetResolutions defined for |eta|<9.9
       //TF1* fPtEta    = ptRes_ -> parameterEta("sigma",jeta_res);
-      TF1* fPhiEta   = phiRes_-> parameterEta("sigma",jeta_res);
+      //TF1* fPhiEta   = phiRes_-> parameterEta("sigma",jeta_res);
       //double sigmapt = fPtEta->Eval(jpt);
-      double sigmaphi = fPhiEta->Eval(jpt);
+      //double sigmaphi = fPhiEta->Eval(jpt);
       //delete fPtEta;
-      delete fPhiEta;
+      //delete fPhiEta;
 
       // new framework
       JME::JetParameters parameters;
       parameters.setJetPt(jpt).setJetEta(jeta).setRho(*rho);
       double sigmapt = resolution.getResolution(parameters);
+      double sigmaphi = resolution_phi.getResolution(parameters);
       double sf = resolution_sf.getScaleFactor(parameters);
 
       // split into high-pt and low-pt sector
@@ -516,7 +524,7 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    }
 
    //delete ptRes_;
-   delete phiRes_;
+   //delete phiRes_;
 
 }
 
@@ -572,7 +580,7 @@ MakeNtuple::beginJob()
    results_tree -> Branch("lumi", &lumi, "lumi/I");
    results_tree -> Branch("event", &event, "event/I");
    results_tree -> Branch("mcweight", &mcweight, "mcweight/D");
-   results_tree -> Branch("mcweightSum", &mcweightSum, "mcweightSum/D");
+   //results_tree -> Branch("mcweightSum", &mcweightSum, "mcweightSum/D");
 
    results_tree -> Branch("muon_pt", &muon_pt);
    results_tree -> Branch("muon_energy", &muon_energy);

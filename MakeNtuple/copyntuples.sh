@@ -1,5 +1,5 @@
 path=/afs/cern.ch/work/n/nmirman/private/CMSSW_7_4_7/src/metsig/Ntuples/Zmumu
-date="20160124"
+date="20160201_74X"
 
 mkdir $path/$date
 
@@ -10,13 +10,17 @@ mkdir $path/$date/WJetsToLNu
 mkdir $path/$date/WW
 mkdir $path/$date/WZ
 mkdir $path/$date/ZZ
+mkdir $path/$date/ST_tW_top
+mkdir $path/$date/ST_tW_antitop
 
 #cp -i crab_20151025_v1/Run2015D-05Oct2015-v1/res/ntuple_* $path/$date/Data
 #cp -i crab_20151025_v1/Run2015D-PromptReco-v4/res/ntuple_* $path/$date/Data
-cp crab_20160124/Run2015D-PromptReco-v3/res/ntuple_* $path/$date/Data
-cp crab_20160124/DYJetsToLL/res/ntuple_* $path/$date/DYJetsToLL
-cp crab_20160124/TTJets/res/ntuple_* $path/$date/TTJets
-cp crab_20160124/WJetsToLNu/res/ntuple_* $path/$date/WJetsToLNu
-#cp crab_20151025_v1/WW/res/ntuple_* $path/$date/WW
-#cp crab_20151025_v1/WZ/res/ntuple_* $path/$date/WZ
-#cp crab_20151025_v1/ZZ/res/ntuple_* $path/$date/ZZ
+cp crab_$date/Run2015D-PromptReco-v3/res/ntuple_* $path/$date/Data
+cp crab_$date/DYJetsToLL/res/ntuple_* $path/$date/DYJetsToLL
+cp crab_$date/TTJets/res/ntuple_* $path/$date/TTJets
+cp crab_$date/WJetsToLNu/res/ntuple_* $path/$date/WJetsToLNu
+cp crab_$date/WW/res/ntuple_* $path/$date/WW
+cp crab_$date/WZ/res/ntuple_* $path/$date/WZ
+cp crab_$date/ZZ/res/ntuple_* $path/$date/ZZ
+cp crab_$date/ST_tW_top/res/ntuple_* $path/$date/ST_tW_top
+cp crab_$date/ST_tW_antitop/res/ntuple_* $path/$date/ST_tW_antitop
