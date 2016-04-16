@@ -91,8 +91,10 @@ class MakeNtuple : public edm::EDAnalyzer {
       edm::EDGetTokenT<edm::View<pat::Jet> > jetToken_;
       std::vector< edm::EDGetTokenT<edm::View<reco::Candidate> > > lepTokens_;
       edm::EDGetTokenT<edm::View<pat::MET> > metToken_;
+      edm::EDGetTokenT<GenEventInfoProduct> genToken_;
+      edm::EDGetTokenT<LHEEventProduct> lheToken_;
       edm::EDGetTokenT< std::vector<pat::Muon> > muonToken_;
-      edm::InputTag verticesTag_;
+      edm::EDGetTokenT<edm::View<reco::Vertex> > verticesToken_;
       Bool_t runOnMC_;
       edm::InputTag addPileupInfo_;
       edm::EDGetTokenT<double> rhoToken_;
@@ -156,7 +158,9 @@ MakeNtuple::MakeNtuple(const edm::ParameterSet& iConfig)
    }
    metToken_ = consumes<edm::View<pat::MET> >(iConfig.getParameter<edm::InputTag>("met"));
    muonToken_ = consumes< std::vector<pat::Muon> >(iConfig.getParameter<edm::InputTag>("muons"));
-   verticesTag_ = iConfig.getParameter<edm::InputTag>("vertices");
+   verticesToken_ = consumes< edm::View<reco::Vertex> >(iConfig.getParameter<edm::InputTag>("vertices"));
+   genToken_ = consumes<GenEventInfoProduct>(iConfig.getParameter<edm::InputTag>("generator"));
+   lheToken_ = consumes<LHEEventProduct>(iConfig.getParameter<edm::InputTag>("lheprod"));
    runOnMC_ = iConfig.getUntrackedParameter<Bool_t>("runOnMC");
    addPileupInfo_ = iConfig.getParameter<edm::InputTag>("addPileupInfo");
    rhoToken_ = consumes<double>(iConfig.getParameter<edm::InputTag>("rho"));
@@ -220,7 +224,7 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
    // offline primary vertices
    edm::Handle<edm::View<reco::Vertex> > vertices;
-   iEvent.getByLabel(verticesTag_, vertices);
+   iEvent.getByToken(verticesToken_, vertices);
    nvertices = int(vertices->size());
 
    // leptons
@@ -362,24 +366,28 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    }
 
    // resolutions
-   std::string path = "CondFormats/JetMETObjects/data/";
+   std::string path = "METSigTuning/MakeNtuple/data/";
    std::string resEra_ = "Summer15_25nsV6";
    std::string resAlg_ = "AK4PFchs";
-   std::string ptResFileName  = /*"../../" + path + "data/" */path + resEra_ + "_MC_PtResolution_" +resAlg_+".txt";
-   std::string phiResFileName = /*path + "/" + */path+"Spring10_PhiResolution_AK5PF.txt";
-   std::string sfResFileName  = /*"../../" + path + "data/" */path + resEra_ + "_DATAMCSF_" +resAlg_+".txt";
+   std::string ptResFileName  = path + resEra_ + "_MC_PtResolution_" +resAlg_+".txt";
+   std::string phiResFileName = path + resEra_ + "_MC_PhiResolution_" +resAlg_+".txt";
+   std::string sfResFileName  = path + resEra_ + "_DATAMCSF_" +resAlg_+".txt";
+
+   std::string phiResFileName_old = /*path + "/" + */path+"Spring10_PhiResolution_AK5PF.txt";
 
    // old framework
    FileInPath fpt(ptResFileName);
    FileInPath fphi(phiResFileName);
    FileInPath fsf(sfResFileName);
 
-   //JetResolution *ptRes_  = new JetResolution(fpt.fullPath().c_str(),false);
-   JetResolution *phiRes_ = new JetResolution(fphi.fullPath().c_str(),false);
+   FileInPath fphi_old(phiResFileName_old);
 
    // new framework
-   JME::JetResolution resolution = JME::JetResolution(fpt.fullPath().c_str());
+   JME::JetResolution resolution_pt = JME::JetResolution(fpt.fullPath().c_str());
+   JME::JetResolution resolution_phi = JME::JetResolution(fphi.fullPath().c_str());
    JME::JetResolutionScaleFactor resolution_sf = JME::JetResolutionScaleFactor(fsf.fullPath().c_str());
+
+   //JetResolution *phiRes_ = new JetResolution(fphi_old.fullPath().c_str(),false);
 
    //
    // begin ttree variables
@@ -387,13 +395,13 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
    if( runOnMC_ ){
       Handle<GenEventInfoProduct> gi;
-      iEvent.getByLabel("generator", gi);
+      iEvent.getByToken(genToken_, gi);
 
-      Handle<LHEEventProduct> li;
-      iEvent.getByLabel("externalLHEProducer", li) ;
+      //Handle<LHEEventProduct> li;
+      //iEvent.getByToken(lheToken_, li) ;
 
       mcweight = gi->weight();
-      mcweightSum = li->originalXWGTUP();
+      //mcweightSum = li->originalXWGTUP();
       //std::cout << mcweight << " " << mcweightSum << std::endl;
       //fflush(stdout);
    }
@@ -448,18 +456,19 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       double jeta = jet->eta();
 
       // jet energy resolutions
-      double jeta_res = (fabs(jeta) < 9.9) ? jeta : 9.89; // JetResolutions defined for |eta|<9.9
+      //double jeta_res = (fabs(jeta) < 9.9) ? jeta : 9.89; // JetResolutions defined for |eta|<9.9
       //TF1* fPtEta    = ptRes_ -> parameterEta("sigma",jeta_res);
-      TF1* fPhiEta   = phiRes_-> parameterEta("sigma",jeta_res);
+      //TF1* fPhiEta   = phiRes_-> parameterEta("sigma",jeta_res);
       //double sigmapt = fPtEta->Eval(jpt);
-      double sigmaphi = fPhiEta->Eval(jpt);
+      //double sigmaphi = fPhiEta->Eval(jpt);
       //delete fPtEta;
-      delete fPhiEta;
+      //delete fPhiEta;
 
       // new framework
       JME::JetParameters parameters;
       parameters.setJetPt(jpt).setJetEta(jeta).setRho(*rho);
-      double sigmapt = resolution.getResolution(parameters);
+      double sigmapt = resolution_pt.getResolution(parameters);
+      double sigmaphi = resolution_phi.getResolution(parameters);
       double sf = resolution_sf.getScaleFactor(parameters);
 
       // split into high-pt and low-pt sector
@@ -516,7 +525,7 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    }
 
    //delete ptRes_;
-   delete phiRes_;
+   //delete phiRes_;
 
 }
 
@@ -572,7 +581,7 @@ MakeNtuple::beginJob()
    results_tree -> Branch("lumi", &lumi, "lumi/I");
    results_tree -> Branch("event", &event, "event/I");
    results_tree -> Branch("mcweight", &mcweight, "mcweight/D");
-   results_tree -> Branch("mcweightSum", &mcweightSum, "mcweightSum/D");
+   //results_tree -> Branch("mcweightSum", &mcweightSum, "mcweightSum/D");
 
    results_tree -> Branch("muon_pt", &muon_pt);
    results_tree -> Branch("muon_energy", &muon_energy);
