@@ -98,6 +98,10 @@ class MakeNtuple : public edm::EDAnalyzer {
       Bool_t runOnMC_;
       edm::InputTag addPileupInfo_;
       edm::EDGetTokenT<double> rhoToken_;
+      std::string jetSFType_;
+      std::string jetResPtType_;
+      std::string jetResPhiType_;
+      
 
       //edm::LumiReWeighting LumiWeights_;
 
@@ -164,6 +168,10 @@ MakeNtuple::MakeNtuple(const edm::ParameterSet& iConfig)
    runOnMC_ = iConfig.getUntrackedParameter<Bool_t>("runOnMC");
    addPileupInfo_ = iConfig.getParameter<edm::InputTag>("addPileupInfo");
    rhoToken_ = consumes<double>(iConfig.getParameter<edm::InputTag>("rho"));
+
+   jetSFType_ = iConfig.getParameter<std::string>("srcJetSF");
+   jetResPtType_ = iConfig.getParameter<std::string>("srcJetResPt");
+   jetResPhiType_ = iConfig.getParameter<std::string>("srcJetResPhi");
 
    //pfjetCorrectorL1_  = iConfig.getUntrackedParameter<std::string>("pfjetCorrectorL1");
    //pfjetCorrectorL123_ = iConfig.getUntrackedParameter<std::string>("pfjetCorrectorL123");
@@ -366,6 +374,7 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    }
 
    // resolutions
+   /*
    std::string path = "METSigTuning/MakeNtuple/data/";
    std::string resEra_ = "Summer15_25nsV6";
    std::string resAlg_ = "AK4PFchs";
@@ -373,7 +382,7 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    std::string phiResFileName = path + resEra_ + "_MC_PhiResolution_" +resAlg_+".txt";
    std::string sfResFileName  = path + resEra_ + "_DATAMCSF_" +resAlg_+".txt";
 
-   std::string phiResFileName_old = /*path + "/" + */path+"Spring10_PhiResolution_AK5PF.txt";
+   std::string phiResFileName_old = path+"Spring10_PhiResolution_AK5PF.txt";
 
    // old framework
    FileInPath fpt(ptResFileName);
@@ -382,10 +391,16 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
    FileInPath fphi_old(phiResFileName_old);
 
-   // new framework
-   JME::JetResolution resolution_pt = JME::JetResolution(fpt.fullPath().c_str());
-   JME::JetResolution resolution_phi = JME::JetResolution(fphi.fullPath().c_str());
-   JME::JetResolutionScaleFactor resolution_sf = JME::JetResolutionScaleFactor(fsf.fullPath().c_str());
+   // accessJERs using text files
+   //JME::JetResolution resolution_pt = JME::JetResolution(fpt.fullPath().c_str());
+   //JME::JetResolutionScaleFactor resolution_sf = JME::JetResolutionScaleFactor(fsf.fullPath().c_str());
+   //JME::JetResolution resolution_phi = JME::JetResolution(fphi.fullPath().c_str());
+   */
+
+   // access JERs using DB
+   JME::JetResolution resolution_pt = JME::JetResolution::get(iSetup, jetResPtType_);
+   JME::JetResolution resolution_phi = JME::JetResolution::get(iSetup, jetResPhiType_);
+   JME::JetResolutionScaleFactor resolution_sf = JME::JetResolutionScaleFactor::get(iSetup, jetSFType_);
 
    //JetResolution *phiRes_ = new JetResolution(fphi_old.fullPath().c_str(),false);
 

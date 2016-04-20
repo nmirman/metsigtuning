@@ -1,5 +1,5 @@
 path=/afs/cern.ch/work/n/nmirman/private/CMSSW_7_4_7/src/metsig/Ntuples/Zmumu
-date="20160126_pt20"
+date="20160418"
 
 mkdir $path/$date
 
