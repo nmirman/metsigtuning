@@ -1,5 +1,5 @@
-path=/afs/cern.ch/work/n/nmirman/private/CMSSW_7_4_7/src/metsig/Ntuples/Zmumu
-date="20160418"
+path=/afs/cern.ch/work/n/nmirman/private/metsig/Ntuples/Zmumu
+date="20160427"
 
 mkdir $path/$date
 
@@ -13,7 +13,7 @@ mkdir $path/$date/ZZ
 mkdir $path/$date/ST_tW_top
 mkdir $path/$date/ST_tW_antitop
 
-cp crab_$date/Run2015D/res/ntuple_* $path/$date/Data
+cp crab_$date/Data/res/ntuple_* $path/$date/Data
 cp crab_$date/DYJetsToLL/res/ntuple_* $path/$date/DYJetsToLL
 cp crab_$date/TTJets/res/ntuple_* $path/$date/TTJets
 cp crab_$date/WJetsToLNu/res/ntuple_* $path/$date/WJetsToLNu

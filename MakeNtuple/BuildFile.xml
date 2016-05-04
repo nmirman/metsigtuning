@@ -10,4 +10,5 @@
 <use name="JetMETCorrections/Objects"/>
 <use name="JetMETCorrections/Modules"/>
 <use name="PhysicsTools/PatUtils"/>
+<use name="PhysicsTools/Utilities"/>
 <flags EDM_PLUGIN="1"/>

@@ -68,6 +68,8 @@
 #include <string>
 #include <sys/stat.h>
 
+#define NUMPUBINS 50
+
 //
 // class declaration
 //
@@ -96,14 +98,15 @@ class MakeNtuple : public edm::EDAnalyzer {
       edm::EDGetTokenT< std::vector<pat::Muon> > muonToken_;
       edm::EDGetTokenT<edm::View<reco::Vertex> > verticesToken_;
       Bool_t runOnMC_;
-      edm::InputTag addPileupInfo_;
+      //edm::InputTag addPileupInfo_;
+      edm::EDGetTokenT<edm::View<PileupSummaryInfo> > pileupToken_;
       edm::EDGetTokenT<double> rhoToken_;
       std::string jetSFType_;
       std::string jetResPtType_;
       std::string jetResPhiType_;
       
 
-      //edm::LumiReWeighting LumiWeights_;
+      edm::LumiReWeighting LumiWeights_;
 
       //std::string pfjetCorrectorL1_;
       //std::string pfjetCorrectorL123_;
@@ -114,6 +117,9 @@ class MakeNtuple : public edm::EDAnalyzer {
       //virtual void endLuminosityBlock(edm::LuminosityBlock const&, edm::EventSetup const&) override;
 
       // ----------member data ---------------------------
+
+      static const double PU2015_MCf[NUMPUBINS];
+      static const double PU2015_Dataf[NUMPUBINS];
 
       TTree *results_tree;
       TFile *OutFile__file;
@@ -136,6 +142,8 @@ class MakeNtuple : public edm::EDAnalyzer {
       double jetThreshold;
 
       int events_total, events_pass;
+
+      double T_nvertices;
 
 };
 
@@ -166,7 +174,8 @@ MakeNtuple::MakeNtuple(const edm::ParameterSet& iConfig)
    genToken_ = consumes<GenEventInfoProduct>(iConfig.getParameter<edm::InputTag>("generator"));
    lheToken_ = consumes<LHEEventProduct>(iConfig.getParameter<edm::InputTag>("lheprod"));
    runOnMC_ = iConfig.getUntrackedParameter<Bool_t>("runOnMC");
-   addPileupInfo_ = iConfig.getParameter<edm::InputTag>("addPileupInfo");
+   //addPileupInfo_ = iConfig.getUntrackedParameter<edm::InputTag>("pileup");
+   pileupToken_ = consumes<edm::View<PileupSummaryInfo> >(iConfig.getUntrackedParameter<edm::InputTag>("pileup"));
    rhoToken_ = consumes<double>(iConfig.getParameter<edm::InputTag>("rho"));
 
    jetSFType_ = iConfig.getParameter<std::string>("srcJetSF");
@@ -198,6 +207,117 @@ MakeNtuple::~MakeNtuple()
 //
 // member functions
 //
+
+const double MakeNtuple::PU2015_MCf[NUMPUBINS] = {
+   // pileup distribution for Fall2015 MC
+   // obtained at https://twiki.cern.ch/twiki/bin/viewauth/CMS/PdmVPileUpDescription#Startup2015
+   // from file SimGeneral/MixingModule/python/mix_2015_25ns_FallMC_matchData_PoissonOOTPU_cfi.py
+   0.000108643,
+   0.000388957,
+   0.000332882,
+   0.00038397,
+   0.000549167,
+   0.00105412,
+   0.00459007,
+   0.0210314,
+   0.0573688,
+   0.103986,
+   0.142369,
+   0.157729,
+   0.147685,
+   0.121027,
+   0.08855,
+   0.0582866,
+   0.0348526,
+   0.019457,
+   0.0107907,
+   0.00654313,
+   0.00463195,
+   0.00370927,
+   0.0031137,
+   0.00261141,
+   0.00215499,
+   0.00174491,
+   0.00138268,
+   0.00106731,
+   0.000798828,
+   0.00057785,
+   0.00040336,
+   0.00027161,
+   0.000176535,
+   0.00011092,
+   6.75502e-05,
+   4.00323e-05,
+   2.32123e-05,
+   1.32585e-05,
+   7.51611e-06,
+   4.25902e-06,
+   2.42513e-06,
+   1.39077e-06,
+   8.02452e-07,
+   4.64159e-07,
+   2.67845e-07,
+   1.5344e-07,
+   8.68966e-08,
+   4.84931e-08,
+   2.6606e-08,
+   1.433e-08
+};
+
+const double MakeNtuple::PU2015_Dataf[NUMPUBINS] = {
+   // 'true' distribution for 2015 RunC+D dataset
+   // obtained with pileupCalc.py (04.21.2016)
+   122059,
+   583201,
+   828340,
+   1.1958e+06,
+   2.11956e+06,
+   5.0101e+06,
+   1.57464e+07,
+   6.08081e+07,
+   1.66592e+08,
+   2.83249e+08,
+   3.66702e+08,
+   3.94001e+08,
+   3.50137e+08,
+   2.5144e+08,
+   1.45141e+08,
+   6.85505e+07,
+   2.81446e+07,
+   1.16883e+07,
+   5.74759e+06,
+   3.04099e+06,
+   1.40423e+06,
+   512164,
+   146784,
+   35302.9,
+   8271.3,
+   2235.61,
+   721.38,
+   258.85,
+   97.2709,
+   36.8716,
+   13.7275,
+   4.93171,
+   1.69241,
+   0.551894,
+   0.170601,
+   0.0499358,
+   0.0138339,
+   0.00362662,
+   0.000899606,
+   0.000211148,
+   4.68928e-05,
+   9.85392e-06,
+   1.95929e-06,
+   3.6862e-07,
+   6.56248e-08,
+   1.10534e-08,
+   1.76248e-09,
+   2.61497e-10,
+   4.768e-11,
+   0
+};
 
 // ------------ method called for each event  ------------
 void
@@ -421,12 +541,15 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       //fflush(stdout);
    }
 
-   /*
    weight_pu = 1.0;
    if( runOnMC_ ){
-      std::vector<PileupSummaryInfo>::const_iterator PVI;
-      Handle<std::vector<PileupSummaryInfo> > PupInfo;
-      iEvent.getByLabel(addPileupInfo_, PupInfo);
+      View<PileupSummaryInfo>::const_iterator PVI;
+      Handle<View<PileupSummaryInfo> > PupInfo;
+      iEvent.getByToken(pileupToken_, PupInfo);
+   //Handle<View<pat::Jet>> inputJets;
+   //Event.getByToken( jetToken_, inputJets );
+   //std::vector<pat::Jet> jets;
+   //for(View<pat::Jet>::const_iterator jet = inputJets->begin(); jet != inputJets->end(); ++jet) {
 
       float Tnvtx = -1.0;
       for(PVI = PupInfo->begin(); PVI != PupInfo->end(); ++PVI) {
@@ -442,7 +565,6 @@ MakeNtuple::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
          T_nvertices = Tnvtx;
       }
    }
-   */
 
    // calculate met_sumpt
    // candidates already have clean jets removed
@@ -579,17 +701,15 @@ MakeNtuple::beginJob()
 
    OutFile__file  = new TFile( OutputFileName_.c_str(), "RECREATE" );
 
-   /*
    // pileup reweighting
-   std::vector< float > PU2012_MC;
-   std::vector< float > PU2012_Data;
+   std::vector< float > PU2015_MC;
+   std::vector< float > PU2015_Data;
 
-   for( int i=0; i<60; i++) {
-      PU2012_MC.push_back( PU2012_MCf[i] );
-      PU2012_Data.push_back( PU2012_Dataf[i] );
+   for( int i=0; i<NUMPUBINS; i++) {
+      PU2015_MC.push_back( PU2015_MCf[i] );
+      PU2015_Data.push_back( PU2015_Dataf[i] );
    }
-   LumiWeights_ = LumiReWeighting( PU2012_MC, PU2012_Data);
-   */
+   LumiWeights_ = edm::LumiReWeighting( PU2015_MC, PU2015_Data);
 
    results_tree = new TTree("events", "events");
    results_tree -> Branch("run", &run, "run/I");
@@ -629,6 +749,7 @@ MakeNtuple::beginJob()
 
    results_tree -> Branch("nvertices", &nvertices);
    results_tree -> Branch("weight_pu", &weight_pu);
+   results_tree -> Branch("nvert_true", &T_nvertices);
 
 }
 
